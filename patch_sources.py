@@ -100,7 +100,7 @@ def main():
     print("\n[1/8] Aligning component URLs...")
     config_path = os.path.join(src_dir, "app/src/main/java/com/fongmi/android/tv/bean/Config.java")
     target_config = 'return item == null ? create(0) : item;'
-    replacement_config = 'if (item != null && android.text.TextUtils.isEmpty(item.getUrl())) { delete(item.getUrl(), 0); item = null; }\n        return item == null ? create(0, "https://files.catbox.moe/6vv3h0.json", "\\u6232\\u7cbe\\u5f71\\u8996") : item;'
+    replacement_config = 'String defaultUrl = com.fongmi.android.tv.BuildConfig.FLAVOR_mode.equals("mobile") ? "__MOBILE_CONFIG_URL__" : "__TV_CONFIG_URL__";\n        if (item != null && (android.text.TextUtils.isEmpty(item.getUrl()) || !item.getUrl().equals(defaultUrl))) { delete(item.getUrl(), 0); item = null; }\n        return item == null ? create(0, defaultUrl, "\\u6232\\u7cbe\\u5f71\\u8996") : item;'
     patch_file_strict(config_path, target_config, replacement_config)
 
     # ========================================
@@ -143,16 +143,17 @@ def main():
         'mBinding.version.setOnClickListener(this::onVersion);',
         'mBinding.version.setOnClickListener(this::onVersion);\n        mBinding.coffee.setOnClickListener(this::onCoffee);')
 
-    patch_file_strict(setting_activity_path,
-        """    private void onVersion(View view) {
+    # Disabling strict error for onVersion/onCoffee method patching to support both older and newer FongMi/TV versions
+    version_patched_lb = False
+    target_version_lb_new = """    private void onVersion(View view) {
         try {
             android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/FongMi/TV"));
             startActivity(intent);
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }""",
-        """    private void onVersion(View view) {
+    }"""
+    replacement_version_lb_new = """    private void onVersion(View view) {
         try {
             android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/FongMi/TV"));
             startActivity(intent);
@@ -173,7 +174,37 @@ def main():
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }""")
+    }"""
+    
+    target_version_lb_old = """    private void onVersion(View view) {
+        Updater.create().force().start(this);
+    }"""
+    replacement_version_lb_old = """    private void onVersion(View view) {
+        Updater.create().force().start(this);
+    }
+
+    private void onCoffee(View view) {
+        try {
+            android.view.View dialogView = android.view.LayoutInflater.from(this).inflate(R.layout.dialog_coffee_tv, null);
+            androidx.appcompat.app.AlertDialog dialog = new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                    .setView(dialogView)
+                    .create();
+            dialogView.findViewById(R.id.btn_close).setOnClickListener(v -> dialog.dismiss());
+            dialog.show();
+            dialogView.findViewById(R.id.btn_close).requestFocus();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }"""
+    
+    if patch_file(setting_activity_path, target_version_lb_new, replacement_version_lb_new):
+        version_patched_lb = True
+    elif patch_file(setting_activity_path, target_version_lb_old, replacement_version_lb_old):
+        version_patched_lb = True
+        
+    if not version_patched_lb:
+        print("Error: Could not patch onVersion in SettingActivity.java")
+        sys.exit(1)
 
     # Mobile
     setting_fragment_path = os.path.join(src_dir, "app/src/mobile/java/com/fongmi/android/tv/ui/fragment/SettingFragment.java")
@@ -201,16 +232,17 @@ def main():
         'mBinding.version.setOnClickListener(this::onVersion);',
         'mBinding.version.setOnClickListener(this::onVersion);\n        mBinding.coffee.setOnClickListener(this::onCoffee);')
 
-    patch_file_strict(setting_fragment_path,
-        """    private void onVersion(View view) {
+    # Disabling strict error for onVersion/onCoffee method patching to support both older and newer FongMi/TV versions
+    version_patched_mb = False
+    target_version_mb_new = """    private void onVersion(View view) {
         try {
             android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/FongMi/TV"));
             startActivity(intent);
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }""",
-        """    private void onVersion(View view) {
+    }"""
+    replacement_version_mb_new = """    private void onVersion(View view) {
         try {
             android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/FongMi/TV"));
             startActivity(intent);
@@ -238,7 +270,44 @@ def main():
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }""")
+    }"""
+    
+    target_version_mb_old = """    private void onVersion(View view) {
+        Updater.create().force().start(requireActivity());
+    }"""
+    replacement_version_mb_old = """    private void onVersion(View view) {
+        Updater.create().force().start(requireActivity());
+    }
+
+    private void onCoffee(View view) {
+        try {
+            View dialogView = LayoutInflater.from(requireActivity()).inflate(R.layout.dialog_coffee, null);
+            dialogView.findViewById(R.id.btn_ecpay).setOnClickListener(v -> {
+                try {
+                    android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://pay.ecpay.com.tw/CreditPayment/ExpressCredit?MerchantID=3494530"));
+                    startActivity(intent);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+            new MaterialAlertDialogBuilder(requireActivity())
+                    .setTitle("請 Yuri 喝杯咖啡")
+                    .setView(dialogView)
+                    .setPositiveButton("關閉", null)
+                    .show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }"""
+    
+    if patch_file(setting_fragment_path, target_version_mb_new, replacement_version_mb_new):
+        version_patched_mb = True
+    elif patch_file(setting_fragment_path, target_version_mb_old, replacement_version_mb_old):
+        version_patched_mb = True
+        
+    if not version_patched_mb:
+        print("Error: Could not patch onVersion in SettingFragment.java")
+        sys.exit(1)
 
     # Redirect version URL from official repository to custom repository
     patch_file(setting_activity_path, "https://github.com/FongMi/TV", "https://github.com/cutepooh520/action-video")
@@ -410,7 +479,8 @@ def main():
                 noticeText = noticeText.replace("\\u996d\\u592a\\u786c", "\\u6232\\u7cbe\\u5f71\\u8996");
                 noticeText = noticeText.replace("\\u514d\\u8d39\\u5206\\u4eab", "");
                 noticeText = noticeText.replace("\\uff0c\\uff0c", "\\uff0c").trim();
-                if (noticeText.endsWith("\\uff0c")) notic            }
+                if (noticeText.endsWith("\\uff0c")) noticeText = noticeText.substring(0, noticeText.length() - 1);
+            }
             final String finalNotice = noticeText;
             App.post(() -> Notify.show(finalNotice));""")
 
