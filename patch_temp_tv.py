@@ -749,6 +749,15 @@ def main():
             applicationIdSuffix ".mobile"
         }""")
 
+    # 6.5. Override version to 0.9.5
+    import re
+    with open(build_gradle_path, 'r', encoding='utf-8') as f:
+        bg_content = f.read()
+    bg_content = re.sub(r'versionCode\s+\d+', 'versionCode 950', bg_content)
+    bg_content = re.sub(r'versionName\s+".*?"', 'versionName "0.9.5"', bg_content)
+    with open(build_gradle_path, 'w', encoding='utf-8') as f:
+        f.write(bg_content)
+
     # 7. 在 fragment_vod.xml 中的 title 加上 dropdown 下拉箭頭
     fragment_vod_path = os.path.join(src_dir, "app/src/mobile/res/layout/fragment_vod.xml")
     patch_file_strict(fragment_vod_path,
