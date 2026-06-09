@@ -788,6 +788,20 @@ def main():
             if os.path.exists(webp_path):
                 os.remove(webp_path)
                 print(f"  [CLEANUP] Cleaned legacy asset: {webp_rel}")
+
+        # Remove existing ic_launcher icons in cloned repo to avoid duplicate resource errors
+        res_dir = os.path.join(src_dir, "app/src/main/res")
+        if os.path.exists(res_dir):
+            for folder in os.listdir(res_dir):
+                if folder.startswith("mipmap-"):
+                    folder_path = os.path.join(res_dir, folder)
+                    for f in os.listdir(folder_path):
+                        if f.startswith("ic_launcher"):
+                            try:
+                                os.remove(os.path.join(folder_path, f))
+                                print(f"  [CLEANUP] Cleaned legacy launcher icon: {folder}/{f}")
+                            except Exception as e:
+                                print(f"  [WARNING] Failed to remove {folder}/{f}: {e}")
                 
         # Copy all files from custom_dir to src_dir
         for root, dirs, files in os.walk(custom_dir):
